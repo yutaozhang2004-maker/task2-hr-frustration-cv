@@ -1,103 +1,257 @@
-\documentclass[11pt]{article}
-\usepackage[a4paper,margin=1in]{geometry}
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{arxiv}
+\usepackage{dsfont}
+\usepackage{amsmath}
+\usepackage[backend=biber]{biblatex}
+
+% --- Core packages
 \usepackage{booktabs}
 \usepackage{graphicx}
-\usepackage{amsmath}
+\usepackage{float}
+\usepackage{amsfonts}
 \usepackage{amssymb}
-\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{lipsum}
+\usepackage{comment}
 
-\setlength{\parskip}{0.4em}
-\setlength{\parindent}{0pt}
+% --- Links (load hyperref LAST among basic packages)
+\usepackage{url}
+\usepackage{doi}
+\usepackage{hyperref}
 
-\title{\vspace{-1.5em}Task 2: A Cross-Validation Scheme for Predicting Frustration from Heart-Rate Signals\vspace{-0.5em}}
-\author{}
-\date{}
+\usepackage{xcolor}
+\usepackage{lastpage}
+\cfoot{\small\color{gray}Page \thepage\ of \pageref{LastPage}}
+
+% --- Tables, lists, formatting
+\usepackage{caption}
+\captionsetup{labelfont=bf, textfont=it}
+\usepackage{enumitem}
+
+% --- Code + colors
+\usepackage{listings}
+
+% --- Line spacing
+\usepackage{setspace}
+\onehalfspacing
+
+% --- Bibliography (biblatex version)
+\addbibresource{references.bib}
+
+% --- Title metadata (Configured for the header)
+\hypersetup{
+pdftitle={TASK 2: Predicting Frustration from Heart Rate Signals},
+pdfsubject={DTU 02445},
+pdfauthor={Yutao Zhang},
+pdfkeywords={}
+}
 
 \begin{document}
-\maketitle
-\vspace{-2.5em}
 
-\section{Task and data}
+\begin{titlepage}
+    \centering
+    \vspace*{0.8cm}
 
-The goal is to predict an individual's self-reported \textbf{frustration} during a collaborative puzzle task from \textbf{heart-rate (HR) summary statistics}. We use a subset of the EmoPairCompete dataset: 14 individuals, each contributing 12 observations (4 puzzling rounds $\times$ 3 phases per round), for 168 rows in total. Each row contains six HR summary statistics (\texttt{HR\_Mean}, \texttt{HR\_Median}, \texttt{HR\_std}, \texttt{HR\_Min}, \texttt{HR\_Max}, \texttt{HR\_AUC}), the categorical \texttt{Round} (1--4) and \texttt{Phase} (1--3) of that observation, and a self-reported \texttt{Frustrated} score (0--8). We binarize the target as $\texttt{Frustrated\_binary} = \mathbb{1}[\texttt{Frustrated} \geq 3]$, giving a moderately imbalanced two-class problem.
+    {\LARGE \textsc{Technical University of Denmark} \par}
+    \vspace{0.2cm}
+    {\large Artificial Intelligence and Data \par}
 
-\section{Feature selection}
+    \vspace{1.2cm}
 
-To decide which heart-rate (HR) features to use, we measured how strongly each of the six available HR statistics is related to frustration. We did this in two ways: using the \emph{raw} values, and using values adjusted to each person's own normal range (each HR feature is converted to a z-score \emph{within that person}, i.e.\ how far above or below their own typical level it is).
+    \includegraphics[width=3.5cm]{DTU-logo.png}
 
-The raw values mostly reflect differences \emph{between} people -- for example, someone whose heart rate runs higher overall might also happen to report more frustration on average, even if the two are not really connected. Adjusting each person's values to their own normal range removes this effect, and instead asks: when \emph{this person's} heart rate is higher or lower than usual, is \emph{their} frustration also higher or lower? This within-person pattern is the one that should still hold for a new person we have not seen before, and it is the version of the data that the logistic regression and ANN models actually train on.
+    \vspace{1.2cm}
 
-After this adjustment, the feature rankings changed considerably:
+    \rule{\textwidth}{1pt}
+    \vspace{0.5cm}
 
-\begin{itemize}
-\item \texttt{HR\_Mean} and \texttt{HR\_Median} became the \emph{strongest} predictors of frustration.
-\item \texttt{HR\_Max} and \texttt{HR\_std} -- which looked strongest in the raw, unadjusted data -- dropped to the \emph{weakest}.
-\item \texttt{HR\_Min} was the weakest predictor under \emph{both} the raw and adjusted rankings, so it is the only feature we remove.
-\end{itemize}
+    {\huge TASK 2: Predicting Frustration from Heart Rate Signals \par}
 
-\textbf{Final feature set (fixed, identical for all three models, no automatic selection):} the remaining five HR features -- \texttt{HR\_Mean}, \texttt{HR\_Median}, \texttt{HR\_std}, \texttt{HR\_Max}, \texttt{HR\_AUC} -- plus \texttt{Phase} and \texttt{Round}, one-hot encoded with the first level as reference (\texttt{Phase\_phase2}, \texttt{Phase\_phase3}; \texttt{Round\_round\_2}, \texttt{Round\_round\_3}, \texttt{Round\_round\_4}) -- 10 input columns in total. The continuous HR features are standardized (logistic regression, ANN) or used at their raw scale (decision tree, whose splits are scale-invariant).
+    \vspace{0.3cm}
+    \rule{\textwidth}{1pt}
 
-\section{Models}
+    \vspace{2.0cm}
 
-We implemented three classifiers that span a range of complexity and interpretability. Each model outputs a probability (e.g.\ a 70\% chance that the person is frustrated). This probability is then compared to a cutoff value to produce the final yes/no answer; the cutoff is not fixed at 50\%, but chosen automatically for the best result (see Section 4). The same probability is also used directly to calculate ROC-AUC.
+    {\Large
+    Yutao Zhang\\
+    Student Number: 255854
+    \par}
 
-\begin{itemize}
-\item \textbf{Logistic regression}: a linear baseline in which every feature's effect is a single, directly interpretable coefficient (log-odds change per unit/level).
-\item \textbf{Decision tree}: a non-linear model that handles a mix of continuous and one-hot categorical inputs without scaling, and whose splits are directly readable as ``if--then'' decision rules.
-\item \textbf{Artificial neural network} (single hidden layer multi-layer perceptron): a more flexible non-linear model capable of representing feature interactions the other two cannot.
-\end{itemize}
+    \vspace{1.5cm}
 
-This set satisfies the requirement of implementing at least two different models while covering the spectrum from fully interpretable to flexible/black-box -- per the assignment, model sophistication itself is not rewarded, so the comparison is designed to be informative regardless of which model ``wins''.
+    {\large
+    \textbf{Course:}\\
+    Project in statistical evaluation of Artificial Intelligence and Data (02445)
+    \par}
 
-\section{Cross-validation and hold-out scheme}
+    \vfill
+\end{titlepage}
 
-The defining structural property of this dataset is \textbf{repeated measures}: each of the 14 individuals contributes 12 rows (4 rounds $\times$ 3 phases), and individuals come from different cohorts. A naive random train/test split would place some rows from the same individual in both sets. Since resting heart rate and HR variability differ substantially between people, a model could partly ``recognize'' an individual from their HR statistics and exploit person-specific information -- producing an overly optimistic performance estimate that would not transfer to a genuinely new person.
+\setcounter{page}{1}
 
-We therefore define the goal as building a \textbf{generalizable} model -- one that predicts frustration for a person \emph{not seen during training}, using only HR features and experimental context (\texttt{Phase}, \texttt{Round}) -- rather than a \emph{personalizable} model that would be calibrated per individual.
+\section*{Introduction}
 
-\textbf{Chosen scheme: nested Leave-One-Subject-Out (LOSO) cross-validation.}
+Frustration is a common but disruptive emotional response during collaborative problem-solving tasks. Self-reported emotional states are subjective and hard to collect mid-task, so physiological signals offer a useful, continuous alternative: heart rate (HR), recorded via wearable sensors, gives an objective window into autonomic arousal. This study tests whether HR summary statistics can predict self-reported frustration during an interactive puzzle task and generalize to people the model has not seen before, rather than building a model personalized to each individual. To keep the performance estimate honest on this small sample, nested Leave-One-Subject-Out cross-validation is used throughout.
 
-\begin{itemize}
-\item \textbf{Outer loop} (\texttt{LeaveOneGroupOut}, grouped by \texttt{Individual}): 14 folds. Each fold withholds all 12 rows of \emph{one} individual as the test set and trains on the remaining 13 individuals (156 rows). That individual's data is never used for training or for any tuning decision in this fold.
-\item \textbf{Inner loop} (\texttt{StratifiedGroupKFold} for logistic regression/ANN, \texttt{GroupKFold} for the decision tree -- again grouped by \texttt{Individual}, on the 13 outer-training individuals): used by \texttt{GridSearchCV} (logistic regression: regularization strength $C$ and \texttt{class\_weight}; decision tree: \texttt{max\_depth} $\in \{1,\dots,8\}$) or \texttt{RandomizedSearchCV} (ANN: hidden-layer size, regularization $\alpha$, activation, learning rate, batch size; 20 random configurations per outer fold) to select hyperparameters, and to generate out-of-fold probabilities for choosing a decision threshold via Youden's $J$ statistic.
-\end{itemize}
+\section{Methods}
 
-The double grouping by \texttt{Individual}, at \emph{both} levels, ensures that no information about an outer test individual -- not even indirectly via a hyperparameter or threshold choice -- leaks into that fold's model. The per-individual z-score normalization of HR features (logistic regression, ANN) uses only that individual's own 12 rows, so it introduces no cross-individual leakage and is safe to apply before splitting.
+\subsection{Data and Target Binarization}
 
-Pooling the 14 outer test folds yields \textbf{168 out-of-fold predictions} -- one per row, each from a model that never saw that person during training or tuning -- giving an honest estimate of generalization to a new individual.
+This study analyzes a 168-row subset of the EmoPairCompete dataset: 14 individuals, each contributing 12 observations from a balanced design of 4 rounds and 3 phases. Each row contains six heart rate statistics (\texttt{HR\_Mean}, \texttt{HR\_Median}, \texttt{HR\_std}, \texttt{HR\_Min}, \texttt{HR\_Max}, \texttt{HR\_AUC}), the categorical \texttt{Round} (1--4) and \texttt{Phase} (1--3), and a self-reported frustration score (0--8).
+
+This is framed as classification rather than regression. The 0--8 score is a subjective self-report, not a precisely measured continuous quantity, and people likely calibrate it differently from one another, so treating it as interval-scaled would assume more precision than the data has. The scores are also heavily skewed low (median 2, mean 2.3; only 6\% of rows are 6 or above), leaving little signal for a regression model to learn from in the upper range with just 14 individuals. Classification also matches the practical goal directly, since flagging distress is itself a binary decision, whereas a regression output would still need a threshold applied afterwards to be useful.
+
+Within that classification framing, a binary rather than a multi-class target is used for two reasons. With only 168 rows from 14 people, splitting into more classes would leave too few examples per class to train reliably, especially for the ANN. Collapsing the scale to a single state-shift also reduces the reporting-noise problem above and matches the practical goal of flagging the moment someone crosses into distress, rather than tracking fine-grained emotional increments.
+
+Because these self-reports are subjective,\footcite[Page 9, Paragraph 3 (under "Phase Analysis")]{das2024} the target is binarized as $\texttt{Frustrated\_binary} = 1$ if $\texttt{Frustrated} \geq 3$, else $0$. This threshold is supported by the data: mean frustration is low during the resting (1.21) and recovery (1.89) phases, but rises to 3.77 during the active puzzle-solving phase.\footnote{See Appendix~\ref{fig:Empirical_threshold}. A threshold of 3 cleanly separates the task-induced state from baseline calm.}
+
+\subsection{Feature Selection and Engineering}
+
+Raw HR values were compared against individual-specific z-scores, where each feature is centered on that person's own mean and scale. This reordered feature importance: \texttt{HR\_Mean} and \texttt{HR\_Median} became the strongest predictors, while \texttt{HR\_Max} and \texttt{HR\_std}, the strongest in the raw data, dropped to the weakest, suggesting that raw variance partly reflects movement artifacts rather than affect. \texttt{HR\_Min} was the weakest predictor in both versions and was dropped.\footnote{Each person's z-score uses that person's own mean and standard deviation computed from all 12 of their rows, which a genuinely new person under leave-one-subject-out would not yet have. Recomputing these statistics from only each person's four resting-phase (\texttt{phase1}) rows, a calibration window that never touches a frustration-relevant row, left logistic regression's pooled balanced accuracy and ROC-AUC essentially unchanged ($0.597\to0.576$ and $0.607\to0.577$), so this does not appear to inflate the reported performance.}
+
+The final feature set is five z-scored HR features (\texttt{Mean}, \texttt{Median}, \texttt{std}, \texttt{Max}, \texttt{AUC}): 5 columns in total. \texttt{Phase}, \texttt{Round}, and \texttt{Puzzler} are not used as model inputs: they describe the experimental design (which segment, repetition, and role a row comes from) rather than a physiological signal, and the model is meant to learn from heart rate, not from recognizing the experimental setup. \texttt{Individual} and \texttt{Cohort} are likewise never inputs; they are used only to define the cross-validation groupings (Section 2.3), not as features to learn from.
+
+\subsection{Classification Models and Cross-Validation}
+
+Two models spanning interpretable to flexible are compared. \textbf{Logistic regression} is a linear model: each feature's effect on the log-odds of frustration is a single, readable coefficient. It is also the model class built specifically for binary outcomes, fitting a Bernoulli likelihood directly, rather than a general-purpose model merely adapted to classification. The \textbf{ANN} is a single hidden-layer multi-layer perceptron, able to capture non-linear feature interactions a linear model cannot, with its size and regularization tuned to limit overfitting on a dataset this small. Both models, the preprocessing pipeline, and the cross-validation splitters described below were implemented in Python with the scikit-learn library (Pedregosa et al., 2011).
+
+The dataset's repeated-measures structure (12 rows per individual) rules out a random train-test split, since a model could partly "recognize" a person from their own baseline HR rather than learning a pattern that generalizes. The 14 individuals also come from two cohorts (8 and 6 individuals, with no individual in both); holding out a full cohort at a time would leave too few people for reliable inner-loop tuning, so individuals rather than cohorts are held out, which still tests generalization to someone absent from training. Nested Leave-One-Subject-Out (LOSO) cross-validation is therefore used: an outer loop holds out one individual at a time across 14 folds, while an inner \texttt{StratifiedGroupKFold} loop on the remaining 13 individuals selects hyperparameters (\texttt{GridSearchCV} for logistic regression's $C$ and \texttt{class\_weight}; \texttt{RandomizedSearchCV} for the ANN's architecture and learning rate) and the decision threshold that maximizes balanced accuracy on the inner folds. Pooling all 14 outer folds gives 168 out-of-fold predictions, one per row, each from a model that never saw that person during training.
 
 \section{Results}
 
-Final hyperparameters (selected by the inner loop, refit on all 14 individuals for interpretation): logistic regression $C=1$, \texttt{class\_weight='balanced'}; decision tree \texttt{max\_depth}$=1$ (selected in \emph{all} 14 outer folds); ANN: one hidden layer of 32 units, \texttt{tanh} activation, $\alpha \approx 0.13$, batch size 16, learning rate $\approx 3.6\times10^{-4}$.
+Logistic regression converged on $C=0.001$ with \texttt{class\_weight='balanced'} -- strong regularization that shrinks all five HR coefficients toward zero; the ANN converged on a single 16-unit hidden layer (\texttt{relu} activation, $\alpha \approx 0.047$, batch size 32, learning rate $\approx 2.4\times10^{-3}$).
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
-\caption{Pooled nested-LOSO out-of-fold performance (168 predictions, 14 individuals).}
+\caption{Pooled nested-LOSO out-of-fold classification metrics (168 predictions), five HR features only. Balanced accuracy is shown with a 95\% cluster-bootstrap confidence interval (resampling individuals, 2000 resamples).}
+\vspace{0.1cm}
 \begin{tabular}{lccc}
 \toprule
-Model & Accuracy & Balanced accuracy & ROC-AUC \\
+Model & Accuracy & Balanced Accuracy [95\% CI] & ROC-AUC \\
 \midrule
-Logistic regression & 0.768 & 0.738 & 0.773 \\
-Decision tree        & 0.768 & 0.741 & 0.579 \\
-ANN                  & 0.738 & 0.714 & 0.727 \\
+Baseline (majority class) & 0.625 & 0.500 & 0.500 \\
+Logistic Regression & 0.595 & 0.597 [0.516, 0.684] & 0.607 \\
+ANN                  & 0.506 & 0.506 [0.446, 0.581] & 0.448 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Model comparison: robustness, generalization, consistency}
+Neither model clearly beats the majority-class baseline (Table 1): logistic regression's balanced-accuracy 95\% confidence interval ([0.516, 0.684]) only barely excludes the 0.50 chance level, and the ANN's ([0.446, 0.581]) includes it outright, with a ROC-AUC of 0.448, worse than random guessing. Both models agree that \texttt{HR\_Mean} is the strongest of the five features (logistic regression's largest coefficient; the ANN's largest permutation importance, $0.092$, with \texttt{HR\_AUC} a distant second at $0.076$), but logistic regression's coefficients are all small ($\leq 0.012$) under the heavy regularization the inner CV selected -- itself a sign that the inner loop found little signal worth fitting.
 
-\textbf{Generalization.} All three models achieve balanced accuracy of 0.71--0.74 on individuals never seen during training or tuning, well above the 0.50 chance level for binary classification -- i.e.\ there is a genuinely generalizable HR/context signal for self-reported frustration.
+A paired Wilcoxon signed-rank test on per-individual balanced accuracy ($n=14$) found no detectable difference between the two models ($p=0.249$); with only 14 individuals the test has low power, so this is read as no detectable difference rather than proof of equivalence. A cluster-bootstrap 95\% CI on the paired difference (LogReg $-$ ANN $=0.090$, 95\% CI [$-0.012$, $0.198$]) and McNemar's test on the pooled predictions ($p=0.044$) both point toward logistic regression doing modestly better, though McNemar assumes independent rows, which the repeated-measures structure violates, so the per-subject Wilcoxon test remains the primary, more trustworthy read.
 
-\textbf{Consistency.} Strikingly, all three models -- despite very different architectures -- independently identify the \emph{same} dominant predictor: \texttt{Phase} (specifically being in phase 2). The decision tree selects \texttt{max\_depth}$=1$ and splits on \texttt{Phase\_phase2} in \emph{every} one of the 14 outer folds; logistic regression's largest coefficient by far is \texttt{Phase\_phase2} ($+2.43$, more than $2.5\times$ the next-largest, \texttt{Round\_round\_4}, $+0.89$); and the ANN's permutation importance ranks \texttt{Phase} far above everything else ($0.242$, almost double the next-highest, \texttt{HR\_Mean} at $0.122$). \texttt{HR\_Mean} is the consistent secondary contributor across all three models.
+\section{Discussion}
 
-\textbf{Robustness / statistical comparison.} Because the 168 pooled predictions are not independent (12 per individual), we compare models using the 14 \emph{per-individual} balanced-accuracy scores -- a paired design, since the same 14 individuals are scored by all three models. Mean per-individual balanced accuracy: decision tree $0.773$, logistic regression $0.765$, ANN $0.734$. A paired Wilcoxon signed-rank test (appropriate given $n=14$ and no assumption of normality) finds \emph{no significant difference} between any pair: logistic regression vs.\ decision tree $p=0.465$; logistic regression vs.\ ANN $p=0.236$; decision tree vs.\ ANN $p=0.066$. All three models are statistically indistinguishable on this dataset.
+Nested LOSO cross-validation was essential here: with only 14 individuals, any split that mixes one person's rows across train and test would overstate how well a model generalizes to someone new.
 
-The decision tree's much lower ROC-AUC (0.579 vs.\ 0.773/0.727) is a separate phenomenon: a depth-1 tree's \texttt{predict\_proba} only takes two distinct values, which limits how finely the ROC curve can rank predictions -- even though its \emph{hard} 0/1 classifications are exactly as accurate as logistic regression's.
+Logistic regression numerically outperforms the ANN on every metric (Table 1): its balanced accuracy and ROC-AUC sit a little above chance, while the ANN's barely move from $0.50$ and its ROC-AUC even dips below it. With only 14 individuals, the ANN has comparatively many parameters relative to the available signal, so its near-chance performance likely reflects overfitting the inner-loop hyperparameter search to noise rather than a genuine inability to use heart rate. The gap is not significant by the per-subject Wilcoxon test ($p=0.249$), but the bootstrap CI on the difference nearly excludes zero and McNemar's cross-check does cross the conventional threshold ($p=0.044$), so the safer reading is a real if modest edge for logistic regression, not that the two models are interchangeable. Both models independently rank \texttt{HR\_Mean} as the strongest HR feature, the one piece of convergent, model-independent evidence that heart rate carries some signal here, however weak. Read together, these results look less like a failed prediction task and more like a validation scheme working as intended: a 14-person, repeated-measures dataset with infrequently-elevated, self-reported frustration scores is not expected to support strong prediction from five HR summary statistics, and an honest cross-validation scheme should show that plainly.
 
-\section{Conclusion}
+Logistic regression is therefore the preferred model: it scores better on every metric, has a convex and deterministic fit that is not sensitive to random initialization the way the ANN's is, and is fully interpretable as the model class built specifically for binary outcomes. Without any demonstrated benefit from the ANN's extra complexity, and with the small sample making that complexity riskier rather than safer, the simpler, auditable model is the more appropriate choice here.
 
-Nested LOSO cross-validation is essential for this dataset: with only 14 individuals each contributing repeated measures, any scheme that mixes one individual's rows across train and test would overstate generalization to new people. The nested design (outer LOSO for evaluation, inner group-aware CV for hyperparameter and threshold selection) gives an honest, leakage-free estimate of how well each model predicts frustration for someone it has never seen.
+\textbf{Reflections on the binarization threshold.} A cutoff of 3 favors sensitivity to early signs of distress over specificity; a cutoff of 4 would trade some of that sensitivity for fewer false positives, since engagement at a score of 3 is not always genuine distress.
 
-All three models -- logistic regression, a decision tree, and a small ANN -- predict self-reported frustration well above chance (balanced accuracy 0.71--0.74), and a paired Wilcoxon test shows the differences between them are not statistically significant given $n=14$. The most robust finding is that \emph{all three models, independently, identify \texttt{Phase} (specifically phase 2) as by far the single most informative feature} -- far more informative than any individual HR statistic, with \texttt{HR\_Mean} a consistent secondary contributor. If one model had to be selected, logistic regression is the most attractive: it ties for the best accuracy/balanced accuracy, has the best ROC-AUC, and remains the most directly interpretable.
+\clearpage
+\printbibliography[title={References}]
 
+
+\section{Appendix}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Empirical_threshold.png}
+    \caption{Empirical Support for Frustration Cut-off Threshold}
+    \label{fig:Empirical_threshold}
+\end{figure}
+\clearpage
+
+\label{Code}
+\textit{The code used in the task can be found in the GitHub repository at:} \href{TODO-INSERT-REPO-URL}{TODO: insert repository URL}.
+
+%husk at ændre
+
+
+
+\section*{Declaration of AI use}
+\small
+I/we have used AI for the following tasks:
+
+\setlist[itemize]{noitemsep, topsep=2pt, partopsep=0pt, parsep=0pt}
+
+\textbf{Writing / Text Generation}
+\begin{itemize}
+  \item[$\blacksquare$] Rephrase or improve wording, grammar, or style.
+  \item[$\square$] Summarize external sources or content.
+  \item[$\blacksquare$] Check or enhance logical flow or structure of the report.
+  \item[$\blacksquare$] Draft sections of the report.
+\end{itemize}
+
+\textbf{Research \& Information Gathering}
+\begin{itemize}
+  \item[$\blacksquare$] Find primary or secondary sources (papers, articles, data).
+  \item[$\blacksquare$] Serve as a primary source of information or data.
+  \item[$\square$] Summarize or extract key points from sources.
+  \item[$\square$] Interpret or explain findings from literature.
+\end{itemize}
+
+\textbf{Idea Generation / Brainstorming}
+\begin{itemize}
+  \item[$\square$] Generate initial ideas or hypotheses for experiments or projects.
+  \item[$\square$] Propose alternative approaches, solutions, or interpretations.
+  \item[$\square$] Suggest research questions or objectives.
+  \item[$\blacksquare$] Identify potential limitations or challenges.
+\end{itemize}
+
+\textbf{Design of Experiments / Methodology}
+\begin{itemize}
+  \item[$\square$] Design experiments or workflows.
+  \item[$\blacksquare$] Optimize parameters or settings for experiments.
+  \item[$\square$] Propose control conditions or comparison groups.
+  \item[$\blacksquare$] Assist with experimental planning or sequencing of tasks.
+\end{itemize}
+
+\textbf{Computer Code / Programming}
+\begin{itemize}
+  \item[$\blacksquare$] Debug code or identify errors.
+  \item[$\blacksquare$] Automate repetitive coding tasks.
+  \item[$\blacksquare$] Explain programming concepts, algorithms, or logic.
+  \item[$\blacksquare$] Optimize or refactor code for efficiency or readability.
+  \item[$\blacksquare$] Generate code snippets or full programs (\textit{not main code}).
+\end{itemize}
+
+\textbf{Figures, Illustrations, \& Visualizations}
+\begin{itemize}
+  \item[$\square$] Propose visual design or layout of figures.
+  \item[$\square$] Edit or format images for the report.
+  \item[$\square$] Generate diagrams, schematics, or drawings.
+  \item[$\blacksquare$] Create or enhance graphs, plots, or charts.
+\end{itemize}
+
+\textbf{Data Analysis \& Interpretation}
+\begin{itemize}
+  \item[$\square$] Process or clean data.
+  \item[$\blacksquare$] Perform statistical analyses.
+  \item[$\blacksquare$] Interpret results or trends.
+  \item[$\blacksquare$] Generate tables or visual summaries of data.
+\end{itemize}
+
+\textbf{Other Uses of AI}
+\begin{itemize}
+  \item[$\square$] Other (please specify):
+  \item[$\blacksquare$] Support use of latex.
+\end{itemize}
+
+\textbf{Confirmation of No Inappropriate Use}
+\begin{itemize}
+  \item[$\blacksquare$] I have not submitted AI-generated work as entirely my own without disclosure.
+  \item[$\blacksquare$] I have not used AI to fabricate or invent data, results, or references.
+  \item[$\blacksquare$] I have not used AI to plagiarize or copy others' work without correct attribution.
+  \item[$\blacksquare$] I have not used AI to violate copyright, GDPR, or confidentiality requirements.
+  \item[$\blacksquare$] I have not used AI to bypass safety, ethical, or legal guidelines related to the project.
+\end{itemize}
+
+\normalsize
 \end{document}
